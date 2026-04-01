@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Focus Mode Controller</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23e06c4e'/%3E%3Ccircle cx='32' cy='32' r='16' fill='%230f0f0f'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page-{{ page|default('timer') }}">
+    <header class="app-header">
+        <div class="container header-inner">
+            <a class="brand" href="{{ url_for('main.index') }}">Focus Mode</a>
+            <nav class="top-nav">
+                <a class="{% if page|default('timer') == 'timer' %}active{% endif %}" href="{{ url_for('main.index') }}">Timer</a>
+                <a class="{% if page|default('timer') == 'settings' %}active{% endif %}" href="{{ url_for('main.settings_page') }}">Settings</a>
+                <a class="{% if page|default('timer') == 'history' %}active{% endif %}" href="{{ url_for('main.history_page') }}">History</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

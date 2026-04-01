@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% set page = 'history' %}
+{% block content %}
+<section class="card page-intro">
+	<h1 class="page-title">History</h1>
+	<p class="page-subtitle">Review your focus streaks and completion trends.</p>
+</section>
+
+<section class="stats-grid">
+	<article class="card stat-card">
+		<h3>Total Focus Time</h3>
+		<p id="statFocusTime">0m</p>
+	</article>
+	<article class="card stat-card">
+		<h3>Total Sessions</h3>
+		<p id="statTotalSessions">0</p>
+	</article>
+	<article class="card stat-card">
+		<h3>Average Per Day</h3>
+		<p id="statAvgPerDay">0</p>
+	</article>
+	<article class="card stat-card">
+		<h3>Best Day</h3>
+		<p id="statBestDay">-</p>
+	</article>
+</section>
+
+<section class="card">
+	<h2>Sessions Completed Per Day (Last 14 Days)</h2>
+	<div class="chart-wrap">
+		<canvas id="historyChart"></canvas>
+	</div>
+</section>
+
+<section class="card">
+	<h2>Session Log</h2>
+	<div class="table-wrap">
+		<table class="history-table">
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Type</th>
+					<th>Duration</th>
+					<th>Completed</th>
+				</tr>
+			</thead>
+			<tbody id="historyRows"></tbody>
+		</table>
+	</div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='history.js') }}"></script>
+{% endblock %}

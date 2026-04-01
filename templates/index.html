@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set page = 'timer' %}
+{% block content %}
+<section class="card permission-banner hidden" id="permissionBanner">
+	<h2>Permissions Needed</h2>
+	<p id="permissionText"></p>
+</section>
+
+<section class="card timer-card">
+	<p class="timer-kicker">Single task. Deep work. Zero noise.</p>
+	<p class="session-label" id="sessionLabel">FOCUS</p>
+
+	<div class="timer-ring-wrap">
+		<svg class="timer-ring" viewBox="0 0 260 260" aria-label="Pomodoro timer ring">
+			<circle class="ring-bg" cx="130" cy="130" r="110"></circle>
+			<circle class="ring-progress" id="ringProgress" cx="130" cy="130" r="110"></circle>
+		</svg>
+		<div class="timer-center">
+			<span id="timeDisplay">25:00</span>
+		</div>
+	</div>
+
+	<div class="dot-row" id="pomodoroDots" aria-label="Pomodoro cycle progress">○○○○</div>
+
+	<div class="controls">
+		<button id="startBtn" class="btn btn-primary">Start</button>
+		<button id="pauseBtn" class="btn">Pause</button>
+		<button id="skipBtn" class="btn">Skip</button>
+	</div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

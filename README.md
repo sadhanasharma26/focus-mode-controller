@@ -1,68 +1,37 @@
-# Focus Mode Controller (macOS)
+# Focus Mode Controller
 
-A local-only Flask + vanilla JS productivity app for Pomodoro sessions with macOS integrations.
+Focus Mode Controller is a local macOS Pomodoro app built with Flask and vanilla JS.
+It runs timed focus sessions and can automatically block distracting sites, toggle Do Not Disturb, and dim windows while you work.
 
 ## Features
 
-- Pomodoro lifecycle with live countdown via Server-Sent Events (SSE)
-- Automatic website blocking by editing `/etc/hosts` (marker-based)
-- Automatic Do Not Disturb enable/disable (Shortcuts first, AppleScript fallback)
-- Optional window dim overlay (best-effort via Hammerspoon CLI)
-- Session history, stats, and chart visualization
-- Settings and blocklist management UI
-- Fully local runtime (no cloud services, no accounts)
+- Live Pomodoro countdown with Server-Sent Events (SSE)
+- Work, short break, and long break session flow
+- Blocklist management for distracting sites
+- Session history dashboard and completion chart
+- Settings UI for durations and integration toggles
+- Demo mode for safe testing (no system changes)
 
-## Project Structure
+## Tech Stack
 
-```text
-focus-mode/
-├── app/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── timer.py
-│   ├── blocker.py
-│   ├── macos.py
-│   ├── database.py
-│   └── models.py
-├── static/
-│   ├── app.js
-│   ├── settings.js
-│   ├── history.js
-│   └── style.css
-├── templates/
-│   ├── base.html
-│   ├── index.html
-│   ├── settings.html
-│   └── history.html
-├── menubar.py
-├── config.py
-├── requirements.txt
-├── run.py
-└── README.md
-```
+- Backend: Flask, SQLAlchemy, APScheduler
+- Frontend: HTML templates + vanilla JavaScript + CSS
+- Database: SQLite (`~/.focus-mode/focus.db`)
+- Platform integrations: macOS Shortcuts, AppleScript, optional Hammerspoon
 
-## Requirements
+## Quick Start
 
-- macOS
-- Python 3.11+
-- Terminal access with `sudo`
-
-## Setup
-
-1. Create and activate a virtual environment.
-2. Install dependencies:
+### 1) Create environment and install dependencies
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Run database initialization implicitly by launching the app (it auto-creates `~/.focus-mode/focus.db`).
+### 2) Run in normal mode (full functionality)
 
-## Run
-
-### Normal mode
-
-Use `sudo` so `/etc/hosts` edits can work:
+Use `sudo` so the app can edit `/etc/hosts` for site blocking:
 
 ```bash
 sudo python3 run.py --port 5000
@@ -70,119 +39,98 @@ sudo python3 run.py --port 5000
 
 Open `http://127.0.0.1:5000`.
 
-### Demo mode (safe testing)
+### 3) Run in demo mode (safe, no OS changes)
 
 ```bash
 python3 run.py --demo --port 5000
 ```
 
-Demo mode behavior:
+Demo mode:
 
-- Seeds 21 days of fake session history
-- Uses 10-second sessions for fast testing
-- Does not edit `/etc/hosts`
-- Does not run osascript/shortcuts system effects
+- Seeds 21 days of sample history
+- Uses 10-second sessions
+- Skips hosts edits and macOS automation effects
 
-## Permissions and macOS Integration
+## macOS Setup
 
-### 1) `/etc/hosts` write permission
+### Hosts write access
 
-- Required for real site blocking
-- Launch app with `sudo` in normal mode
+- Required for real website blocking
+- Run normal mode with `sudo`
 
-If not writable, the app logs a warning and continues without crashing.
-
-### 2) Accessibility permission (for automation/dimming checks)
+### Accessibility permission
 
 Grant access at:
 
 - `System Settings` -> `Privacy & Security` -> `Accessibility`
-- Enable the terminal app (and/or Python host you use to launch the app)
+- Enable your terminal (or Python host app)
 
-If not granted, dimming/automation gracefully skips and UI shows warnings.
+### Do Not Disturb shortcuts (recommended)
 
-### 3) Do Not Disturb Shortcuts (recommended)
-
-Create two macOS Shortcuts with exact names:
+Create two shortcuts with exact names:
 
 - `Enable Do Not Disturb`
 - `Disable Do Not Disturb`
 
-Then verify in terminal:
+Verify:
 
 ```bash
 shortcuts list
 ```
 
-The app tries these first, then falls back to AppleScript best-effort behavior.
 
-## Logging
+## Scripts
 
-Errors/warnings from integrations are written to:
+### API smoke checks
 
-- `~/.focus-mode/focus.log`
+```bash
+./scripts/api_smoke.sh
+./scripts/api_smoke.sh http://127.0.0.1:5050
+```
 
-Failures are isolated (blocking, DND, dimming fail independently) and do not crash Flask.
+### One-command demo smoke flow
 
-## Optional Menubar App
+```bash
+./scripts/smoke_demo.sh
+./scripts/smoke_demo.sh 5051
+```
 
-`menubar.py` provides a minimal menu bar icon using `rumps`.
+If your Python executable is different:
+
+```bash
+PYTHON_BIN=.venv/bin/python3 ./scripts/smoke_demo.sh
+```
+
+## Logging and Data
+
+- Logs: `~/.focus-mode/focus.log`
+- DB: `~/.focus-mode/focus.db`
+- Integrations fail safely: blocking, DND, and dimming errors are isolated and do not crash the app
+
+## Optional Menubar Mode
 
 Run:
 
 ```bash
-python menubar.py
+python3 menubar.py
 ```
 
 Menu options:
 
-- `Open App` (opens browser to `http://127.0.0.1:5000`)
-- `Quit`
+- Open App
+- Quit
 
-## Notes
+## Project Layout
 
-- Chart rendering uses Chart.js from CDN on the History page.
-- All app data is local in `~/.focus-mode/`.
-- SSE endpoint: `GET /stream`
-
-## Quick API Regression Check
-
-After starting the app, run:
-
-```bash
-./scripts/api_smoke.sh
-```
-
-Custom base URL (if using a different port):
-
-```bash
-./scripts/api_smoke.sh http://127.0.0.1:5050
-```
-
-This script uses `curl` to verify key pages and APIs:
-
-- Session controls
-- Settings CRUD
-- Blocklist add/toggle/delete
-- History and permissions endpoints
-
-### One-command Demo Smoke Flow
-
-Start app in demo mode, run smoke checks, then stop automatically:
-
-```bash
-./scripts/smoke_demo.sh
-```
-
-Custom port:
-
-```bash
-./scripts/smoke_demo.sh 5051
-```
-
-If your Python executable is not at `.venv/bin/python`, pass it explicitly:
-
-```bash
-PYTHON_BIN=.venv/bin/python3 ./scripts/smoke_demo.sh
+```text
+focus-mode-controller/
+├── app/
+├── static/
+├── templates/
+├── scripts/
+├── config.py
+├── run.py
+├── menubar.py
+└── README.md
 ```
 

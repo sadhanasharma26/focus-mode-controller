@@ -133,4 +133,4 @@ focus-mode-controller/
 ├── menubar.py
 └── README.md
 ```
-
+## Open to use, and contributions are welcome:)

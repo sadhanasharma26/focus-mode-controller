@@ -28,7 +28,13 @@ function renderStats(history) {
     const workSessions = history.filter((row) => row.session_type === 'work' && row.completed);
     const totalFocusMinutes = workSessions.reduce((sum, row) => sum + Number(row.duration_minutes || 0), 0);
     const totalSessions = history.length;
-    const avgPerDay = (totalSessions / 14).toFixed(1);
+    const representedDays = new Set(
+        history
+            .filter((row) => row.started_at)
+            .map((row) => row.started_at.slice(0, 10)),
+    ).size;
+    const avgDivisor = Math.max(1, Math.min(14, representedDays));
+    const avgPerDay = (totalSessions / avgDivisor).toFixed(1);
 
     const dayCounts = {};
     history.forEach((row) => {

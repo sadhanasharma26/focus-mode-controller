@@ -218,6 +218,17 @@ body {
     justify-content: center;
 }
 
+.timer-status {
+    min-height: 1.25rem;
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.timer-status.error {
+    color: #b34343;
+}
+
 .btn {
     border: 1px solid #cdbfa8;
     background: var(--surface-2);

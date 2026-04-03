@@ -7,6 +7,7 @@ const sessionLabel = document.getElementById('sessionLabel');
 const pomodoroDots = document.getElementById('pomodoroDots');
 const permissionBanner = document.getElementById('permissionBanner');
 const permissionText = document.getElementById('permissionText');
+const timerStatus = document.getElementById('timerStatus');
 
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
@@ -15,11 +16,28 @@ const skipBtn = document.getElementById('skipBtn');
 let lastKnownState = {
     active: false,
     session_type: 'work',
+    next_session_type: 'work',
     seconds_remaining: 25 * 60,
     duration_seconds: 25 * 60,
     completed_pomodoros: 0,
     paused: false,
 };
+
+let cycleThreshold = 4;
+
+function setTimerStatus(message, isError = false) {
+    if (!timerStatus) return;
+    timerStatus.textContent = message || '';
+    timerStatus.classList.toggle('error', Boolean(isError));
+}
+
+function inferNextSessionType(state) {
+    const completed = Number(state.completed_pomodoros || 0);
+    if (completed > 0 && completed % Math.max(1, cycleThreshold) === 0) {
+        return 'long_break';
+    }
+    return completed > 0 ? 'short_break' : 'work';
+}
 
 function mmss(totalSeconds) {
     const safe = Math.max(0, Number(totalSeconds) || 0);
@@ -45,16 +63,19 @@ function updateTimeDisplay(state) {
 }
 
 function updateSessionLabel(state) {
-    const type = state.session_type || 'work';
+    const type = state.active
+        ? (state.session_type || 'work')
+        : (state.next_session_type || inferNextSessionType(state));
+
     if (type === 'short_break') {
-        sessionLabel.textContent = 'SHORT BREAK';
+        sessionLabel.textContent = state.active ? 'SHORT BREAK' : 'NEXT: SHORT BREAK';
         return;
     }
     if (type === 'long_break') {
-        sessionLabel.textContent = 'LONG BREAK';
+        sessionLabel.textContent = state.active ? 'LONG BREAK' : 'NEXT: LONG BREAK';
         return;
     }
-    sessionLabel.textContent = 'FOCUS';
+    sessionLabel.textContent = state.active ? 'FOCUS' : 'NEXT: FOCUS';
 }
 
 function updatePomodorodots(state) {
@@ -70,7 +91,7 @@ function updateButtonStates(state) {
     const active = Boolean(state.active);
     const paused = Boolean(state.paused);
 
-    startBtn.disabled = active && !paused;
+    startBtn.disabled = active;
     pauseBtn.disabled = !active;
     skipBtn.disabled = !active;
 
@@ -92,6 +113,15 @@ async function postJson(url, body = {}) {
         throw new Error(err.error || `Request failed: ${res.status}`);
     }
     return res.json();
+}
+
+async function loadCycleSettings() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) {
+        throw new Error(`Failed to load settings: ${res.status}`);
+    }
+    const settings = await res.json();
+    cycleThreshold = Math.max(1, Number(settings.long_break_after) || 4);
 }
 
 async function checkPermissions() {
@@ -124,6 +154,9 @@ async function checkPermissions() {
 
 function applyState(state) {
     lastKnownState = { ...lastKnownState, ...state };
+    if (!lastKnownState.active) {
+        lastKnownState.next_session_type = state.next_session_type || inferNextSessionType(lastKnownState);
+    }
     updateTimerRing(lastKnownState);
     updateTimeDisplay(lastKnownState);
     updateSessionLabel(lastKnownState);
@@ -133,12 +166,14 @@ function applyState(state) {
 
 startBtn.addEventListener('click', async () => {
     try {
-        const body = { session_type: 'work' };
+        const body = { session_type: lastKnownState.next_session_type || inferNextSessionType(lastKnownState) };
         const data = await postJson('/session/start', body);
         if (data.state) {
             applyState(data.state);
         }
+        setTimerStatus('');
     } catch (err) {
+        setTimerStatus(err.message, true);
         console.error(err);
     }
 });
@@ -150,13 +185,16 @@ pauseBtn.addEventListener('click', async () => {
             if (data.state) {
                 applyState(data.state);
             }
+            setTimerStatus('');
         } else {
             const data = await postJson('/session/pause');
             if (data.state) {
                 applyState(data.state);
             }
+            setTimerStatus('');
         }
     } catch (err) {
+        setTimerStatus(err.message, true);
         console.error(err);
     }
 });
@@ -165,9 +203,11 @@ skipBtn.addEventListener('click', async () => {
     try {
         const data = await postJson('/session/skip');
         if (data.state) {
-            applyState(data.state);
+            applyState({ ...data.state, next_session_type: data.next_session_type });
         }
+        setTimerStatus('');
     } catch (err) {
+        setTimerStatus(err.message, true);
         console.error(err);
     }
 });
@@ -183,4 +223,6 @@ source.onerror = () => {
 };
 
 checkPermissions();
-applyState(lastKnownState);
+loadCycleSettings()
+    .catch((err) => setTimerStatus(err.message, true))
+    .finally(() => applyState(lastKnownState));

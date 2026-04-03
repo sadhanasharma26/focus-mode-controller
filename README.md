@@ -65,7 +65,7 @@ pip install -r requirements.txt
 Use `sudo` so `/etc/hosts` edits can work:
 
 ```bash
-sudo python run.py --port 5000
+sudo python3 run.py --port 5000
 ```
 
 Open `http://127.0.0.1:5000`.
@@ -73,7 +73,7 @@ Open `http://127.0.0.1:5000`.
 ### Demo mode (safe testing)
 
 ```bash
-python run.py --demo --port 5000
+python3 run.py --demo --port 5000
 ```
 
 Demo mode behavior:
@@ -178,5 +178,11 @@ Custom port:
 
 ```bash
 ./scripts/smoke_demo.sh 5051
+```
+
+If your Python executable is not at `.venv/bin/python`, pass it explicitly:
+
+```bash
+PYTHON_BIN=.venv/bin/python3 ./scripts/smoke_demo.sh
 ```
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import time
 
 from config import APP_DIR, LOG_PATH
 
@@ -16,6 +17,10 @@ if not _logger.handlers:
     _handler = logging.FileHandler(LOG_PATH)
     _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     _logger.addHandler(_handler)
+
+_PERMISSION_CACHE_TTL_SECONDS = 15.0
+_permission_cache: dict[str, bool] | None = None
+_permission_cache_expires_at = 0.0
 
 
 def _run_command(command: list[str]) -> bool:
@@ -196,6 +201,13 @@ def check_permissions() -> dict[str, bool]:
     - accessibility: can send accessibility events via osascript
     - shortcuts: shortcuts CLI is available
     """
+    global _permission_cache
+    global _permission_cache_expires_at
+
+    now = time.monotonic()
+    if _permission_cache is not None and now < _permission_cache_expires_at:
+        return dict(_permission_cache)
+
     permissions = {
         "hosts_writable": os.access("/etc/hosts", os.W_OK),
         "accessibility": False,
@@ -212,4 +224,6 @@ def check_permissions() -> dict[str, bool]:
     except Exception as exc:
         _logger.warning("Error checking accessibility permission: %s", exc)
 
+    _permission_cache = dict(permissions)
+    _permission_cache_expires_at = now + _PERMISSION_CACHE_TTL_SECONDS
     return permissions

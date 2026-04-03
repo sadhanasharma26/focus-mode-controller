@@ -7,7 +7,7 @@ import logging
 import re
 import time
 
-from flask import Blueprint, Response, jsonify, render_template, request
+from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
 
 from .database import get_session
 from .macos import check_permissions
@@ -92,6 +92,22 @@ def _validate_domain(domain: str) -> bool:
     return True
 
 
+def _parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if value in {0, 1}:
+            return bool(value)
+        raise ValueError("boolean integer values must be 0 or 1")
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "n", "off"}:
+            return False
+    raise ValueError("invalid boolean value")
+
+
 @main_bp.route("/")
 def index():
     return render_template("index.html")
@@ -155,15 +171,25 @@ def session_skip():
 def stream():
     def event_stream():
         last_state = None
-        while True:
-            current = json.dumps(get_session_state())
-            if current != last_state:
-                yield f"data: {current}\n\n"
-                last_state = current
-            time.sleep(1)
+        idle_ticks = 0
+        try:
+            while True:
+                current = json.dumps(get_session_state())
+                if current != last_state:
+                    yield f"data: {current}\n\n"
+                    last_state = current
+                    idle_ticks = 0
+                else:
+                    idle_ticks += 1
+                    if idle_ticks >= 15:
+                        yield ": keepalive\n\n"
+                        idle_ticks = 0
+                time.sleep(1)
+        except GeneratorExit:
+            _logger.info("SSE client disconnected")
 
     return Response(
-        event_stream(),
+        stream_with_context(event_stream()),
         mimetype="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -203,7 +229,11 @@ def api_settings_post():
 
         for key in ["block_sites", "enable_dnd", "dim_windows"]:
             if key in payload:
-                setattr(settings, key, bool(payload[key]))
+                try:
+                    parsed = _parse_bool(payload[key])
+                except ValueError:
+                    return jsonify({"error": f"{key} must be a boolean"}), 400
+                setattr(settings, key, parsed)
 
         if "dim_opacity" in payload:
             try:
@@ -264,7 +294,10 @@ def api_blocklist_patch(entry_id: int):
         if "enabled" not in payload:
             row.enabled = not row.enabled
         else:
-            row.enabled = bool(payload["enabled"])
+            try:
+                row.enabled = _parse_bool(payload["enabled"])
+            except ValueError:
+                return jsonify({"error": "enabled must be a boolean"}), 400
 
         return jsonify({"ok": True, "entry": _serialize_blocklist(row)})
 

@@ -64,6 +64,45 @@ expect_body_has() {
   fi
 }
 
+extract_json_field() {
+  local file="$1"
+  local field="$2"
+
+  if command -v jq >/dev/null 2>&1; then
+    jq -r "$field" "$file" 2>/dev/null || true
+    return
+  fi
+
+  python3 - "$file" "$field" <<'PY' 2>/dev/null || true
+import json
+import sys
+
+path = sys.argv[1]
+field = sys.argv[2]
+
+with open(path, "r", encoding="utf-8") as handle:
+    payload = json.load(handle)
+
+if not field.startswith("."):
+    raise SystemExit(1)
+
+value = payload
+for token in field[1:].split("."):
+    if token == "":
+        continue
+    if isinstance(value, dict):
+        value = value.get(token)
+    else:
+        value = None
+        break
+
+if value is None:
+    raise SystemExit(1)
+
+print(value)
+PY
+}
+
 printf 'Running API smoke tests against %s\n' "$BASE_URL"
 
 # Pages
@@ -94,7 +133,7 @@ status="$(request POST /api/blocklist "{\"domain\":\"$rnd_domain\"}" "$TMP_DIR/b
 expect_status 'POST /api/blocklist' 201 "$status"
 expect_body_has 'Added blocklist entry contains domain' "$rnd_domain" "$TMP_DIR/blocklist_add.json"
 
-entry_id="$(sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p' "$TMP_DIR/blocklist_add.json" | head -n1)"
+entry_id="$(extract_json_field "$TMP_DIR/blocklist_add.json" '.entry.id')"
 if [[ -z "$entry_id" ]]; then
   fail 'Unable to parse blocklist entry id from add response'
 fi

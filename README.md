@@ -5,6 +5,7 @@ It runs timed focus sessions and can automatically block distracting sites, togg
 
 ## Features
 
+- macOS-style animated dashboard: live clock, today's focus stats, streak, weekly trend, utility status, and blocklist at a glance
 - Live Pomodoro countdown with Server-Sent Events (SSE)
 - Work, short break, and long break session flow
 - Blocklist management for distracting sites

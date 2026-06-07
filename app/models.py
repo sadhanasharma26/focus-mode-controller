@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
@@ -17,7 +18,7 @@ class PomodoroSession(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     session_type: Mapped[str] = mapped_column(String(20), nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

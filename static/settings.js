@@ -7,7 +7,7 @@ function normalizeDomain(raw) {
 }
 
 function boolIcon(value) {
-    return value ? 'OK' : 'WARN';
+    return value ? 'Granted' : 'Missing';
 }
 
 async function fetchJson(url, options = {}) {

@@ -23,7 +23,10 @@ _permission_cache: dict[str, bool] | None = None
 _permission_cache_expires_at = 0.0
 
 
-def _run_command(command: list[str]) -> bool:
+_COMMAND_TIMEOUT_SECONDS = 10.0
+
+
+def _run_command(command: list[str], timeout: float = _COMMAND_TIMEOUT_SECONDS) -> bool:
     """Run a command safely and return True on success."""
     try:
         completed = subprocess.run(
@@ -31,6 +34,7 @@ def _run_command(command: list[str]) -> bool:
             check=False,
             capture_output=True,
             text=True,
+            timeout=timeout,
         )
         if completed.returncode != 0:
             _logger.warning(
@@ -42,6 +46,9 @@ def _run_command(command: list[str]) -> bool:
                 _logger.warning("stderr: %s", completed.stderr.strip())
             return False
         return True
+    except subprocess.TimeoutExpired:
+        _logger.warning("Command timed out after %.0fs: %s", timeout, " ".join(command))
+        return False
     except Exception as exc:
         _logger.warning("Command execution error for %s: %s", " ".join(command), exc)
         return False
@@ -214,13 +221,24 @@ def check_permissions() -> dict[str, bool]:
         "shortcuts": False,
     }
 
+    if _is_demo_mode():
+        # Demo mode must never trigger macOS permission prompts (the osascript
+        # probe can block indefinitely waiting for user approval).
+        permissions.update({"accessibility": True, "shortcuts": True})
+        _permission_cache = dict(permissions)
+        _permission_cache_expires_at = now + _PERMISSION_CACHE_TTL_SECONDS
+        return permissions
+
     try:
-        permissions["shortcuts"] = _run_command(["which", "shortcuts"])
+        permissions["shortcuts"] = _run_command(["which", "shortcuts"], timeout=3.0)
     except Exception as exc:
         _logger.warning("Error checking shortcuts permission: %s", exc)
 
     try:
-        permissions["accessibility"] = _run_osascript('tell application "System Events" to get name of first process')
+        permissions["accessibility"] = _run_command(
+            ["osascript", "-e", 'tell application "System Events" to get name of first process'],
+            timeout=4.0,
+        )
     except Exception as exc:
         _logger.warning("Error checking accessibility permission: %s", exc)
 

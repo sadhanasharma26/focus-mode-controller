@@ -1,3 +1,6 @@
+let historyChart = null;
+let historyCache = [];
+
 function formatType(sessionType) {
     if (sessionType === 'short_break') return 'Short Break';
     if (sessionType === 'long_break') return 'Long Break';
@@ -73,16 +76,25 @@ function renderChart(history) {
         }
     });
 
+    if (historyChart) {
+        historyChart.destroy();
+    }
+
+    const css = getComputedStyle(document.documentElement);
+    const accent = css.getPropertyValue('--accent').trim();
+    const muted = css.getPropertyValue('--faint').trim();
+    const grid = css.getPropertyValue('--border').trim();
+
     const ctx = document.getElementById('historyChart').getContext('2d');
-    new Chart(ctx, {
+    historyChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
             datasets: [{
                 label: 'Completed Sessions',
                 data: counts,
-                backgroundColor: '#e06c4e',
-                borderRadius: 6,
+                backgroundColor: accent,
+                borderRadius: 5,
             }],
         },
         options: {
@@ -94,11 +106,11 @@ function renderChart(history) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: { color: '#aaa', precision: 0 },
-                    grid: { color: '#2a2a2a' },
+                    ticks: { color: muted, precision: 0 },
+                    grid: { color: grid },
                 },
                 x: {
-                    ticks: { color: '#aaa' },
+                    ticks: { color: muted },
                     grid: { display: false },
                 },
             },
@@ -120,7 +132,9 @@ function renderTable(history) {
     history.forEach((row) => {
         const tr = document.createElement('tr');
         const when = row.started_at ? new Date(row.started_at).toLocaleString() : '-';
-        const completed = row.completed ? 'YES' : 'NO';
+        const completed = row.completed
+            ? '<span class="pill pill-on">Done</span>'
+            : '<span class="pill pill-off">Skipped</span>';
         tr.innerHTML = `
             <td>${when}</td>
             <td>${formatType(row.session_type)}</td>
@@ -134,10 +148,18 @@ function renderTable(history) {
 async function initHistoryPage() {
     const res = await fetch('/api/history');
     const history = await res.json();
+    historyCache = history;
     renderStats(history);
     renderChart(history);
     renderTable(history);
 }
+
+// Re-render the chart with the new palette when the theme changes.
+window.addEventListener('themechange', () => {
+    if (historyCache.length || historyChart) {
+        renderChart(historyCache);
+    }
+});
 
 initHistoryPage().catch((err) => {
     const tbody = document.getElementById('historyRows');

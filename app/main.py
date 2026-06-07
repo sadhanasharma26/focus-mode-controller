@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import time
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
 
@@ -317,3 +318,78 @@ def api_history_get():
 @main_bp.route("/api/permissions", methods=["GET"])
 def api_permissions_get():
     return jsonify(check_permissions())
+
+
+@main_bp.route("/api/dashboard", methods=["GET"])
+def api_dashboard_get():
+    """Aggregate stats for the dashboard widgets."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    today = now.date()
+    window_start = now - timedelta(days=30)
+
+    with get_session() as db:
+        orm_rows = (
+            db.query(PomodoroSession)
+            .filter(PomodoroSession.started_at >= window_start)
+            .order_by(PomodoroSession.started_at.desc())
+            .all()
+        )
+        # Detach plain values before the session closes.
+        rows = [
+            {
+                "session_type": row.session_type,
+                "completed": row.completed,
+                "started_at": row.started_at,
+                "duration_minutes": row.duration_minutes,
+            }
+            for row in orm_rows
+        ]
+
+        blocklist_total = db.query(BlocklistEntry).count()
+        blocklist_enabled = (
+            db.query(BlocklistEntry).filter(BlocklistEntry.enabled.is_(True)).count()
+        )
+        settings = _get_settings(db)
+        settings_payload = _serialize_settings(settings)
+
+    completed_work = [
+        row for row in rows
+        if row["session_type"] == "work" and row["completed"] and row["started_at"]
+    ]
+
+    today_focus_minutes = sum(
+        row["duration_minutes"] for row in completed_work
+        if row["started_at"].date() == today
+    )
+    today_sessions = sum(
+        1 for row in rows
+        if row["completed"] and row["started_at"] and row["started_at"].date() == today
+    )
+
+    # Streak: consecutive days (ending today or yesterday) with >=1 completed work session.
+    work_days = {row["started_at"].date() for row in completed_work}
+    streak = 0
+    cursor = today if today in work_days else today - timedelta(days=1)
+    while cursor in work_days:
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    week = []
+    for offset in range(6, -1, -1):
+        day = today - timedelta(days=offset)
+        week.append({
+            "day": day.strftime("%a"),
+            "date": day.isoformat(),
+            "count": sum(1 for row in completed_work if row["started_at"].date() == day),
+        })
+
+    return jsonify({
+        "today_focus_minutes": today_focus_minutes,
+        "today_sessions": today_sessions,
+        "streak_days": streak,
+        "week": week,
+        "blocklist": {"total": blocklist_total, "enabled": blocklist_enabled},
+        "settings": settings_payload,
+        "permissions": check_permissions(),
+        "state": get_session_state(),
+    })

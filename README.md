@@ -1,22 +1,35 @@
 # Focus Mode Controller
 
-Focus Mode Controller is a local macOS Pomodoro app built with Flask and vanilla JS.
-It runs timed focus sessions and can automatically block distracting sites, toggle Do Not Disturb, and dim windows while you work.
+A local macOS Pomodoro dashboard built with Flask and vanilla JS.
+It runs timed focus sessions and can automatically block distracting sites, toggle Do Not Disturb, and dim windows while you work — all from a minimalist, animated, bento-style dashboard with light and dark themes.
+
+![Dashboard — dark theme](docs/screenshots/dashboard-dark.png)
 
 ## Features
 
-- macOS-style animated dashboard: live clock, today's focus stats, streak, weekly trend, utility status, and blocklist at a glance
-- Live Pomodoro countdown with Server-Sent Events (SSE)
-- Work, short break, and long break session flow
-- Blocklist management for distracting sites
-- Session history dashboard and completion chart
+- **Bento dashboard** — at-a-glance stat cards (today's focus, sessions, day streak, sites blocked), live world-style clock with greeting, daily-goal progress ring, weekly trend chart, utility status, and blocklist
+- **Animated Pomodoro timer** — gradient progress ring with tick marks, glow while focusing, session-aware colors (blue for focus, green for breaks), live countdown over Server-Sent Events (SSE)
+- **Light + dark themes** — toggle in the titlebar, defaults to your system preference, persisted across visits
+- Work, short break, and long break session flow with cycle tracking
+- Blocklist management for distracting sites (`/etc/hosts` based)
+- Session history with stats and a completion chart
 - Settings UI for durations and integration toggles
 - Demo mode for safe testing (no system changes)
+
+## Screenshots
+
+| Focus session (dark) | Dashboard (light) |
+| --- | --- |
+| ![Active focus session](docs/screenshots/focus-active-dark.png) | ![Dashboard — light theme](docs/screenshots/dashboard-light.png) |
+
+| History (dark) | Settings (light) |
+| --- | --- |
+| ![History](docs/screenshots/history-dark.png) | ![Settings](docs/screenshots/settings-light.png) |
 
 ## Tech Stack
 
 - Backend: Flask, SQLAlchemy, APScheduler
-- Frontend: HTML templates + vanilla JavaScript + CSS
+- Frontend: HTML templates + vanilla JavaScript + CSS (no build step)
 - Database: SQLite (`~/.focus-mode/focus.db`)
 - Platform integrations: macOS Shortcuts, AppleScript, optional Hammerspoon
 
@@ -79,7 +92,6 @@ Verify:
 shortcuts list
 ```
 
-
 ## Scripts
 
 ### API smoke checks
@@ -129,6 +141,7 @@ focus-mode-controller/
 ├── static/
 ├── templates/
 ├── scripts/
+├── docs/screenshots/
 ├── config.py
 ├── run.py
 ├── menubar.py

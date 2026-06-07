@@ -85,6 +85,10 @@ function updateSessionLabel(state) {
         ? (state.session_type || 'work')
         : (state.next_session_type || inferNextSessionType(state));
 
+    if (timerCard) {
+        timerCard.classList.toggle('break', type !== 'work');
+    }
+
     if (type === 'short_break') {
         sessionLabel.textContent = state.active ? 'SHORT BREAK' : 'NEXT: SHORT BREAK';
         return;
@@ -192,6 +196,7 @@ function applyState(state) {
     updateSessionLabel(lastKnownState);
     updatePomodorodots(lastKnownState);
     updateButtonStates(lastKnownState);
+    updateHeroStatus(lastKnownState);
 }
 
 startBtn.addEventListener('click', async () => {
@@ -256,14 +261,76 @@ source.onerror = () => {
 
 const clockTime = document.getElementById('clockTime');
 const clockDate = document.getElementById('clockDate');
+const greetingEl = document.getElementById('greeting');
+const heroStatus = document.getElementById('heroStatus');
+
+function greetingForHour(hour) {
+    if (hour < 5) return 'Burning the midnight oil';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    if (hour < 21) return 'Good evening';
+    return 'Winding down';
+}
 
 function tickClock() {
     if (!clockTime) return;
     const now = new Date();
-    clockTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    // Split off seconds so they render smaller, world-clock style.
+    const parts = time.match(/^(\d{1,2}[:.]\d{2})[:.](\d{2})(.*)$/);
+    if (parts) {
+        clockTime.innerHTML = `${parts[1]}<small>:${parts[2]}</small>${parts[3] || ''}`;
+    } else {
+        clockTime.textContent = time;
+    }
     clockDate.textContent = now.toLocaleDateString(undefined, {
         weekday: 'long', month: 'long', day: 'numeric',
     });
+    if (greetingEl) {
+        greetingEl.textContent = greetingForHour(now.getHours());
+    }
+}
+
+function updateHeroStatus(state) {
+    if (!heroStatus) return;
+    let text = 'Ready for a focus session';
+    if (state.active && state.paused) {
+        text = 'Session paused — take your time';
+    } else if (state.active && state.session_type === 'work') {
+        text = 'In deep focus. Distractions silenced.';
+    } else if (state.active) {
+        text = 'On a break. Stretch, breathe, hydrate.';
+    } else if (Number(state.completed_pomodoros) > 0) {
+        text = `${state.completed_pomodoros} pomodoro${state.completed_pomodoros === 1 ? '' : 's'} down — keep the streak alive`;
+    }
+    if (heroStatus.textContent !== text) {
+        heroStatus.textContent = text;
+        heroStatus.classList.remove('swap');
+        void heroStatus.offsetWidth; // restart animation
+        heroStatus.classList.add('swap');
+    }
+}
+
+/* Animated count-up for stat values */
+function countUp(el, target, formatter) {
+    const duration = 700;
+    const start = performance.now();
+    const from = Number(el.dataset.current || 0);
+    const to = Number(target) || 0;
+    el.dataset.current = String(to);
+
+    if (from === to) {
+        el.textContent = formatter(to);
+        return;
+    }
+
+    function frame(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = formatter(Math.round(from + (to - from) * eased));
+        if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
 }
 
 function formatFocusMinutes(minutes) {
@@ -285,16 +352,20 @@ function renderWeekChart(week) {
         col.className = `mini-bar${d.count === 0 ? ' empty' : ''}${i === week.length - 1 ? ' today' : ''}`;
         col.title = `${d.date}: ${d.count} focus session${d.count === 1 ? '' : 's'}`;
 
+        const value = document.createElement('span');
+        value.className = 'bar-value';
+        value.textContent = d.count || '';
+
         const bar = document.createElement('span');
         bar.className = 'bar';
-        bar.style.height = `${d.count === 0 ? 4 : Math.round((d.count / max) * 58) + 6}px`;
+        bar.style.height = d.count === 0 ? '4px' : `${Math.round((d.count / max) * 92) + 8}px`;
         bar.style.animationDelay = `${i * 60}ms`;
 
         const label = document.createElement('span');
         label.className = 'bar-label';
         label.textContent = d.day;
 
-        col.append(bar, label);
+        col.append(value, bar, label);
         host.appendChild(col);
     });
 }
@@ -346,10 +417,11 @@ function renderUtilities(data) {
 }
 
 function renderBlocklistWidget(data) {
+    const enabled = (data.blocklist || {}).enabled || 0;
     const count = document.getElementById('blockCount');
-    const chips = document.getElementById('blockChips');
-    if (!count || !chips) return;
-    count.textContent = String((data.blocklist || {}).enabled || 0);
+    const total = document.getElementById('blockTotal');
+    if (count) countUp(count, enabled, String);
+    if (total) total.textContent = String(enabled);
 }
 
 async function renderBlockChips() {
@@ -376,9 +448,33 @@ async function loadDashboard() {
     if (!res.ok) throw new Error(`Dashboard load failed: ${res.status}`);
     const data = await res.json();
 
-    document.getElementById('todayFocus').textContent = formatFocusMinutes(data.today_focus_minutes);
-    document.getElementById('todaySessions').textContent = String(data.today_sessions);
-    document.getElementById('streakDays').textContent = data.streak_days > 0 ? `${data.streak_days}d` : '0';
+    countUp(document.getElementById('todayFocus'), data.today_focus_minutes, formatFocusMinutes);
+    countUp(document.getElementById('todaySessions'), data.today_sessions, String);
+    countUp(document.getElementById('streakDays'), data.streak_days, (v) => (v > 0 ? `${v}d` : '0'));
+
+    // Daily goal ring (2h of completed focus).
+    const goalRing = document.getElementById('goalRing');
+    const goalPct = document.getElementById('goalPct');
+    const goalSub = document.getElementById('goalSub');
+    if (goalRing && goalPct) {
+        const GOAL_MINUTES = 120;
+        const minutes = Number(data.today_focus_minutes) || 0;
+        const pct = Math.min(100, Math.round(minutes / GOAL_MINUTES * 100));
+        const c = 2 * Math.PI * 52;
+        goalRing.style.strokeDasharray = `${c}`;
+        goalRing.style.strokeDashoffset = `${c * (1 - pct / 100)}`;
+        goalRing.classList.toggle('done', pct >= 100);
+        countUp(goalPct, pct, (v) => `${v}%`);
+        if (goalSub) {
+            goalSub.textContent = `${formatFocusMinutes(minutes)} of ${formatFocusMinutes(GOAL_MINUTES)} focused`;
+        }
+    }
+
+    const weekTotal = document.getElementById('weekTotal');
+    if (weekTotal) {
+        const total = (data.week || []).reduce((sum, d) => sum + d.count, 0);
+        weekTotal.textContent = `${total} session${total === 1 ? '' : 's'}`;
+    }
 
     renderWeekChart(data.week || []);
     renderUtilities(data);

@@ -215,8 +215,10 @@ def check_permissions() -> dict[str, bool]:
     if _permission_cache is not None and now < _permission_cache_expires_at:
         return dict(_permission_cache)
 
+    # Honor the same hosts-file override the blocker uses (demo/testing).
+    hosts_path = os.environ.get("FOCUS_HOSTS_FILE", "/etc/hosts")
     permissions = {
-        "hosts_writable": os.access("/etc/hosts", os.W_OK),
+        "hosts_writable": os.access(hosts_path, os.W_OK),
         "accessibility": False,
         "shortcuts": False,
     }
